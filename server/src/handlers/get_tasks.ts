@@ -1,26 +1,35 @@
+import { db } from '../db';
+import { tasksTable } from '../db/schema';
 import { type GetTasksInput, type Task } from '../schema';
+import { eq, and, desc, SQL } from 'drizzle-orm';
 
-export async function getTasks(input: GetTasksInput, userId: number): Promise<Task[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to fetch tasks for the authenticated user
-    // with optional filtering by completion status and priority.
-    // Steps:
-    // 1. Build query to fetch tasks for the specific user
-    // 2. Apply filters if provided (completed status, priority)
-    // 3. Order by created_at or due_date
-    // 4. Return filtered task list
-    
-    return Promise.resolve([
-        {
-            id: 1,
-            user_id: userId,
-            title: 'Sample Task',
-            description: 'This is a sample task',
-            due_date: new Date(),
-            priority: 'Medium' as const,
-            is_completed: false,
-            created_at: new Date(),
-            updated_at: new Date()
-        }
-    ] as Task[]);
-}
+export const getTasks = async (input: GetTasksInput, userId: number): Promise<Task[]> => {
+  try {
+    // Build conditions array
+    const conditions: SQL<unknown>[] = [
+      eq(tasksTable.user_id, userId) // Always filter by user
+    ];
+
+    // Apply optional filters
+    if (input.completed !== undefined) {
+      conditions.push(eq(tasksTable.is_completed, input.completed));
+    }
+
+    if (input.priority !== undefined) {
+      conditions.push(eq(tasksTable.priority, input.priority));
+    }
+
+    // Build and execute query in one go
+    const results = await db.select()
+      .from(tasksTable)
+      .where(and(...conditions))
+      .orderBy(desc(tasksTable.created_at))
+      .execute();
+
+    // Return results (no numeric conversions needed for this table)
+    return results;
+  } catch (error) {
+    console.error('Get tasks failed:', error);
+    throw error;
+  }
+};

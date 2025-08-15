@@ -1,24 +1,66 @@
+import { db } from '../db';
+import { tasksTable } from '../db/schema';
 import { type UpdateTaskInput, type Task } from '../schema';
+import { eq, and } from 'drizzle-orm';
 
 export async function updateTask(input: UpdateTaskInput, userId: number): Promise<Task> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to update an existing task for the authenticated user.
-    // Steps:
-    // 1. Verify task exists and belongs to the authenticated user
-    // 2. Update only the provided fields (partial update)
-    // 3. Update the updated_at timestamp
-    // 4. Return the updated task data
-    // 5. Throw error if task not found or doesn't belong to user
-    
-    return Promise.resolve({
-        id: input.id,
-        user_id: userId,
-        title: input.title || 'Updated Task',
-        description: input.description !== undefined ? input.description : 'Updated description',
-        due_date: input.due_date !== undefined ? input.due_date : new Date(),
-        priority: input.priority || 'Medium',
-        is_completed: input.is_completed !== undefined ? input.is_completed : false,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as Task);
+  try {
+    // First verify task exists and belongs to the authenticated user
+    const existingTask = await db.select()
+      .from(tasksTable)
+      .where(
+        and(
+          eq(tasksTable.id, input.id),
+          eq(tasksTable.user_id, userId)
+        )
+      )
+      .limit(1)
+      .execute();
+
+    if (existingTask.length === 0) {
+      throw new Error('Task not found or access denied');
+    }
+
+    // Build update object with only provided fields
+    const updateData: any = {
+      updated_at: new Date() // Always update timestamp
+    };
+
+    if (input.title !== undefined) {
+      updateData.title = input.title;
+    }
+    if (input.description !== undefined) {
+      updateData.description = input.description;
+    }
+    if (input.due_date !== undefined) {
+      updateData.due_date = input.due_date;
+    }
+    if (input.priority !== undefined) {
+      updateData.priority = input.priority;
+    }
+    if (input.is_completed !== undefined) {
+      updateData.is_completed = input.is_completed;
+    }
+
+    // Update the task
+    const result = await db.update(tasksTable)
+      .set(updateData)
+      .where(
+        and(
+          eq(tasksTable.id, input.id),
+          eq(tasksTable.user_id, userId)
+        )
+      )
+      .returning()
+      .execute();
+
+    if (result.length === 0) {
+      throw new Error('Failed to update task');
+    }
+
+    return result[0];
+  } catch (error) {
+    console.error('Task update failed:', error);
+    throw error;
+  }
 }

@@ -1,23 +1,28 @@
+import { db } from '../db';
+import { tasksTable } from '../db/schema';
 import { type GetTaskInput, type Task } from '../schema';
+import { eq, and } from 'drizzle-orm';
 
-export async function getTask(input: GetTaskInput, userId: number): Promise<Task> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to fetch a specific task by ID for the authenticated user.
-    // Steps:
-    // 1. Query database for task with given ID
-    // 2. Verify task belongs to the authenticated user
-    // 3. Throw error if task not found or doesn't belong to user
-    // 4. Return the task data
-    
-    return Promise.resolve({
-        id: input.id,
-        user_id: userId,
-        title: 'Sample Task',
-        description: 'This is a sample task',
-        due_date: new Date(),
-        priority: 'Medium' as const,
-        is_completed: false,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as Task);
-}
+export const getTask = async (input: GetTaskInput, userId: number): Promise<Task> => {
+  try {
+    // Query database for task with given ID that belongs to the authenticated user
+    const results = await db.select()
+      .from(tasksTable)
+      .where(and(
+        eq(tasksTable.id, input.id),
+        eq(tasksTable.user_id, userId)
+      ))
+      .execute();
+
+    // Check if task was found
+    if (results.length === 0) {
+      throw new Error(`Task with ID ${input.id} not found or access denied`);
+    }
+
+    // Return the task (no numeric conversions needed for this schema)
+    return results[0];
+  } catch (error) {
+    console.error('Get task failed:', error);
+    throw error;
+  }
+};
